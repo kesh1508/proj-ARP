@@ -78,19 +78,7 @@ def move_sequence():
     time.sleep(4)  # Wait for 4 seconds
     relay2.off()  # Turn off relay 2
 
-def check_sensor_values(sensors):
-    """Check if the sensor values match the required condition."""
-    required_values = [8100, 8100, 190, 430, 8100]
-    sensor_values = []
-
-    for i, sensor in enumerate(sensors[:5]):  # Only check the first 5 sensors
-        distance = sensor.get_distance()
-        sensor_values.append(distance)
-
-    print(f"Sensor values: {sensor_values}")
-    return sensor_values == required_values
-
-def detect_objects(sensors):
+def detect_objects():
     """Function to capture an image and detect objects using the trained Haar Cascade."""
     object_detector = cv2.CascadeClassifier("/home/keshavek/Downloads/cars.xml")
     picam2.start()
@@ -117,13 +105,9 @@ def detect_objects(sensors):
             print("Object detected!")
             action = input("Type 'c' to continue or 'q' to quit: ")
             if action == 'c':
-                if check_sensor_values(sensors):  # Check if sensor values match
-                    print("Sensor values match, executing move sequence.")
-                    picam2.stop()
-                    cv2.destroyAllWindows()
-                    return True
-                else:
-                    print("Sensor values do not match, aborting move sequence.")
+                picam2.stop()
+                cv2.destroyAllWindows()
+                return True
             elif action == 'q':
                 picam2.stop()
                 cv2.destroyAllWindows()
@@ -153,6 +137,11 @@ if timing < 20000:
     timing = 20000
 print("Timing %d ms" % (timing / 1000))
 
+def sensor_values_within_tolerance(sensor_values, expected_values, tolerance=100):
+    """Check if all sensor values are within the specified tolerance."""
+    return all(abs(sensor_value - expected_value) <= tolerance
+               for sensor_value, expected_value in zip(sensor_values, expected_values))
+
 try:
     while True:
         for event in pygame.event.get():
@@ -172,8 +161,20 @@ try:
                     relay1.on()  # Turn on relay 1
                 elif event.key == pygame.K_DOWN:
                     print("Turning relay 2 ON")
-                    if detect_objects(sensors):  # Check for object detection and sensor values
-                        move_sequence()  # Execute movement sequence
+                    if detect_objects():  # Check for object detection
+                        print("Checking sensor values...")
+                        sensor_values = []
+                        for i, sensor in enumerate(sensors[:5]):  # Only check the first 5 sensors
+                            distance = sensor.get_distance()
+                            sensor_values.append(distance)
+
+                        expected_values = [8100, 8100, 190, 430, 8100]
+                        if sensor_values_within_tolerance(sensor_values, expected_values):
+                            print("Sensor values within tolerance, executing move sequence.")
+                            move_sequence()  # Execute movement sequence
+                        else:
+                            print("Sensor values not within tolerance, sequence not executed.")
+
                     relay2.on()  # Turn on relay 2
 
             if event.type == pygame.KEYUP:
@@ -202,4 +203,3 @@ finally:
     relay1.off()
     relay2.off()
     pygame.quit()
-
