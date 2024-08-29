@@ -25,7 +25,7 @@ servo_left = 1     # Extreme left
 servo_right = -1   # Extreme right
 
 # Setup the relay devices
-relay1 = OutputDevice(relay1_pin, active_high=False)  # Active high means relay is on when GPIO is high
+relay1 = OutputDevice(relay1_pin, active_high=False)
 relay2 = OutputDevice(relay2_pin, active_high=False)
 
 # Initialize Picamera2
@@ -46,37 +46,37 @@ def move_sequence():
     # 1. Move left & forward
     print("Moving servo left and relay 1 ON")
     set_servo_position(servo_left)
-    relay1.on()  # Forward
-    time.sleep(5)  # Wait for 5 seconds
-    relay1.off()  # Turn off relay 1
+    relay1.on()
+    time.sleep(5)
+    relay1.off()
 
     # 2. Move right & backward
     print("Moving servo right and relay 2 ON")
     set_servo_position(servo_right)
-    relay2.on()  # Backward
-    time.sleep(12)  # Wait for 12 seconds
-    relay2.off()  # Turn off relay 2
+    relay2.on()
+    time.sleep(12)
+    relay2.off()
 
     # 3. Move left & backward
     print("Moving servo left and relay 2 ON")
     set_servo_position(servo_left)
-    relay2.on()  # Backward
-    time.sleep(12)  # Wait for 12 seconds
-    relay2.off()  # Turn off relay 2
+    relay2.on()
+    time.sleep(12)
+    relay2.off()
 
     # 4. Move right & forward
     print("Moving servo right and relay 1 ON")
     set_servo_position(servo_right)
-    relay1.on()  # Forward
-    time.sleep(4)  # Wait for 4 seconds
-    relay1.off()  # Turn off relay 1
+    relay1.on()
+    time.sleep(4)
+    relay1.off()
 
     # 5. Move backward
     print("Centering servo and turning relay 2 ON")
     set_servo_position(servo_mid)
-    relay2.on()  # Backward
-    time.sleep(4)  # Wait for 4 seconds
-    relay2.off()  # Turn off relay 2
+    relay2.on()
+    time.sleep(4)
+    relay2.off()
 
 def detect_objects():
     """Function to capture an image and detect objects using the trained Haar Cascade."""
@@ -142,6 +142,38 @@ def sensor_values_within_tolerance(sensor_values, expected_values, tolerance=100
     return all(abs(sensor_value - expected_value) <= tolerance
                for sensor_value, expected_value in zip(sensor_values, expected_values))
 
+def calculate_distance_between_objects():
+    """Calculate the distance between objects based on sensor readings."""
+    initial_distance = sensors[2].get_distance()  # Get initial distance from the third sensor
+
+    if initial_distance < 200:  # Initial object detected
+        print("Initial object detected, starting to move backward...")
+        relay2.on()  # Start moving backward
+        start_time = time.time()
+
+        while True:
+            current_distance = sensors[2].get_distance()
+
+            if current_distance > 3000:  # Object moved away (distance increased significantly)
+                print("Object moved away, measuring time duration...")
+                break
+
+        # Wait until the object is detected again
+        while True:
+            current_distance = sensors[2].get_distance()
+
+            if current_distance < 200:  # Object reappeared
+                print("Second object detected!")
+                end_time = time.time()
+                relay2.off()  # Stop moving backward
+                break
+
+        duration = end_time - start_time  # Calculate the time duration for which the distance was long
+        distance_between_objects = duration * 0.0497  # Calculate the distance based on time and speed
+
+        print(f"Distance between objects: {distance_between_objects:.2f} meters")
+        return distance_between_objects
+
 try:
     while True:
         keys_pressed = pygame.key.get_pressed()
@@ -174,13 +206,18 @@ try:
 
                             expected_values = [8100, 8100, 190, 430, 8100]
                             if sensor_values_within_tolerance(sensor_values, expected_values):
-                                print("Sensor values within tolerance, executing move sequence.")
-                                move_sequence()  # Execute movement sequence
+                                print("Sensor values within tolerance, calculating distance between objects...")
+                                distance = calculate_distance_between_objects()  # Calculate distance between objects
+                                if distance > 1.05:
+                                    print("Distance greater than 1.05 meters, executing move sequence.")
+                                    move_sequence()  # Execute movement sequence
+                                else:
+                                    print("Distance less than or equal to 1.05 meters, sequence not executed.")
                             else:
                                 print("Sensor values not within tolerance, sequence not executed.")
                     else:
-                        print("Down Arrow pressed without R, turning relay 2 ON")
-                        relay2.on()  # Turn on relay 2
+                        print("Down Arrow pressed without R, turning relay 2 ON and measuring distance")
+                        calculate_distance_between_objects()  # Calculate distance between objects
 
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
@@ -199,7 +236,6 @@ except KeyboardInterrupt:
     print("Program terminated")
 
 finally:
-    # Stop ranging on each TCA9548A bus
     for sensor in sensors:
         sensor.stop_ranging()
 
