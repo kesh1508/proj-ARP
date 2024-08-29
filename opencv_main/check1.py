@@ -6,6 +6,7 @@ from gpiozero import Servo, OutputDevice
 import pygame
 import time
 import VL53L0X
+import threading
 
 # Initialize pygame
 pygame.init()
@@ -100,18 +101,11 @@ def detect_objects():
         # Display image
         cv2.imshow("Camera", im)
 
-        # If an object is detected, prompt the user
+        # If an object is detected, set the event and exit
         if len(objects) > 0:
             print("Object detected!")
-            action = input("Type 'c' to continue or 'q' to quit: ")
-            if action == 'c':
-                picam2.stop()
-                cv2.destroyAllWindows()
-                return True
-            elif action == 'q':
-                picam2.stop()
-                cv2.destroyAllWindows()
-                return False
+            object_detected_event.set()
+            break
 
         # Check for 'q' key press to exit
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -119,7 +113,6 @@ def detect_objects():
 
     picam2.stop()
     cv2.destroyAllWindows()
-    return False
 
 # Create VL53L0X objects for devices on each TCA9548A bus
 sensors = []
@@ -173,6 +166,15 @@ def calculate_distance_between_objects():
 
         print(f"Distance between objects: {distance_between_objects:.2f} meters")
         return distance_between_objects
+    else:
+        print("Initial distance not less than 200mm, no action taken.")
+        return 0
+
+# Initialize event
+object_detected_event = threading.Event()
+
+# Initialize detection_thread variable
+detection_thread = None
 
 try:
     while True:
@@ -196,34 +198,39 @@ try:
 
                 elif event.key == pygame.K_DOWN:
                     if keys_pressed[pygame.K_r]:
-                        print("R and Down Arrow pressed, turning on camera and relay 2")
-                        if detect_objects():  # Check for object detection
-                            print("Checking sensor values...")
-                            sensor_values = []
-                            for i, sensor in enumerate(sensors[:5]):  # Only check the first 5 sensors
-                                distance = sensor.get_distance()
-                                sensor_values.append(distance)
-
-                            expected_values = [8100, 8100, 190, 430, 8100]
-                            if sensor_values_within_tolerance(sensor_values, expected_values):
-                                print("Sensor values within tolerance, calculating distance between objects...")
-                                distance = calculate_distance_between_objects()  # Calculate distance between objects
-                                if distance > 1.05:
-                                    print("Distance greater than 1.05 meters, executing move sequence.")
-                                    move_sequence()  # Execute movement sequence
-                                else:
-                                    print("Distance less than or equal to 1.05 meters, sequence not executed.")
-                            else:
-                                print("Sensor values not within tolerance, sequence not executed.")
+                        print("R and Down Arrow pressed, starting object detection")
+                        # Start object detection in a separate thread
+                        if not object_detected_event.is_set() and (detection_thread is None or not detection_thread.is_alive()):
+                            detection_thread = threading.Thread(target=detect_objects)
+                            detection_thread.start()
                     else:
                         print("Down Arrow pressed without R, turning relay 2 ON and measuring distance")
-                        calculate_distance_between_objects()  # Calculate distance between objects
+                        relay2.on()
+                        distance = calculate_distance_between_objects()
 
-                elif event.key == pygame.K_c:
-                    print("C key pressed, starting distance measurement...")
-                    calculate_distance_between_objects()  # Start distance measurement
+                elif event.key == pygame.K_c and object_detected_event.is_set():
+                    print("C key pressed, calculating distance between objects...")
+                    # Check sensor values
+                    sensor_values = []
+                    for i, sensor in enumerate(sensors[:5]):  # Only check the first 5 sensors
+                        distance = sensor.get_distance()
+                        sensor_values.append(distance)
 
-            if event.type == pygame.KEYUP:
+                    expected_values = [8100, 8100, 190, 430, 8100]
+                    if sensor_values_within_tolerance(sensor_values, expected_values):
+                        print("Sensor values within tolerance, calculating distance between objects...")
+                        distance = calculate_distance_between_objects()  # Calculate distance between objects
+                        if distance > 1.05:
+                            print("Distance greater than 1.05 meters, executing move sequence.")
+                            move_sequence()  # Execute movement sequence
+                        else:
+                            print("Distance less than or equal to 1.05 meters, sequence not executed.")
+                    else:
+                        print("Sensor values not within tolerance, sequence not executed.")
+                    # Reset the event
+                    object_detected_event.clear()
+
+            elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                     print("Centering servo")
                     set_servo_position(servo_mid)  # Center the servo when key is released
