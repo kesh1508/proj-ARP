@@ -154,22 +154,49 @@ def calculate_distance_between_objects():
         relay2.on()  # Start moving backward
         start_time = time.time()
 
+        # Introduce a delay between readings
+        delay = 0.1  # 100 ms
+
+        # Initialize a moving average filter
+        window_size = 5
+        distances = []
+
         while True:
             current_distance = sensors[2].get_distance()
+            distances.append(current_distance)
 
-            if current_distance > 3000:  # Object moved away (distance increased significantly)
+            # Calculate the moving average
+            if len(distances) > window_size:
+                distances.pop(0)
+            avg_distance = sum(distances) / len(distances)
+
+            # Use a threshold with hysteresis
+            if avg_distance > 3000 and initial_distance < 200:  # Object moved away (distance increased significantly)
                 print("Object moved away, measuring time duration...")
                 break
+
+            # Add a delay between readings
+            time.sleep(delay)
 
         # Wait until the object is detected again
         while True:
             current_distance = sensors[2].get_distance()
+            distances.append(current_distance)
 
-            if current_distance < 200:  # Object reappeared
+            # Calculate the moving average
+            if len(distances) > window_size:
+                distances.pop(0)
+            avg_distance = sum(distances) / len(distances)
+
+            # Use a threshold with hysteresis
+            if avg_distance < 150 and initial_distance > 3000:  # Object reappeared
                 print("Second object detected!")
                 end_time = time.time()
                 relay2.off()  # Stop moving backward
                 break
+
+            # Add a delay between readings
+            time.sleep(delay)
 
         duration = end_time - start_time  # Calculate the time duration for which the distance was long
         distance_between_objects = duration * 0.0497  # Calculate the distance based on time and speed
