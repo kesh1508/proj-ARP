@@ -137,10 +137,13 @@ if timing < 20000:
     timing = 20000
 print("Timing %d ms" % (timing / 1000))
 
-def sensor_values_within_tolerance(sensor_values, expected_values, tolerance=100):
-    """Check if all sensor values are within the specified tolerance."""
-    return all(abs(sensor_value - expected_value) <= tolerance
-               for sensor_value, expected_value in zip(sensor_values, expected_values))
+def sensor_values_within_tolerance(sensor_values, expected_values_list, tolerance=100):
+    """Check if sensor values match any of the expected value sets within tolerance."""
+    for expected_values in expected_values_list:
+        if all(abs(sensor_value - expected_value) <= tolerance
+               for sensor_value, expected_value in zip(sensor_values, expected_values)):
+            return True
+    return False
 
 def calculate_distance_between_objects():
     """Calculate the distance between objects based on sensor readings."""
@@ -177,6 +180,13 @@ def calculate_distance_between_objects():
 try:
     distance_measurement_active = False  # Flag to control when distance measurement is active
 
+    # Define expected sensor values sets
+    expected_values_list = [
+        [8100, 8100, 190, 430, 8100],
+        [8100, 8100, 350, 8100, 8100],
+        [8100, 8100, 500, 8100, 8100]
+    ]
+
     while True:
         keys_pressed = pygame.key.get_pressed()
 
@@ -209,8 +219,7 @@ try:
                             distance = sensor.get_distance()
                             sensor_values.append(distance)
 
-                        expected_values = [8100, 8100, 190, 430, 8100]
-                        if sensor_values_within_tolerance(sensor_values, expected_values):
+                        if sensor_values_within_tolerance(sensor_values, expected_values_list):
                             print("Sensor values within tolerance, calculating distance between objects...")
                             distance = calculate_distance_between_objects()  # Calculate distance between objects
                             if distance > 1.05:
@@ -242,4 +251,4 @@ finally:
         sensor.stop_ranging()
 
     print("All sensors stopped")
-    servo.value = servo
+    servo.value = servo_mid
