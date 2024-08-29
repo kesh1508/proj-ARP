@@ -219,6 +219,10 @@ try:
                         print("Down Arrow pressed without R, turning relay 2 ON and measuring distance")
                         calculate_distance_between_objects()  # Calculate distance between objects
 
+                elif event.key == pygame.K_c:
+                    print("C key pressed, starting distance measurement...")
+                    calculate_distance_between_objects()  # Start distance measurement
+
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                     print("Centering servo")
