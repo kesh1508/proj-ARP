@@ -146,63 +146,51 @@ def sensor_values_within_tolerance(sensor_values, expected_values_list, toleranc
     return False
 
 def calculate_distance_between_objects():
-    """Calculate the distance between objects based on sensor readings."""
-    initial_distance = sensors[2].get_distance()  # Get initial distance from the third sensor
+    initial_distance = sensors[2].get_distance()
+    print(f"Initial distance: {initial_distance}")
 
-    if initial_distance < 200:  # Initial object detected
+    if initial_distance < 200:
         print("Initial object detected, starting to move backward...")
-        relay2.on()  # Start moving backward
+        relay2.on()
         start_time = time.time()
 
-        # Introduce a delay between readings
-        delay = 0.1  # 100 ms
-
-        # Initialize a moving average filter
-        window_size = 5
         distances = []
-
         while True:
             current_distance = sensors[2].get_distance()
             distances.append(current_distance)
-
-            # Calculate the moving average
-            if len(distances) > window_size:
-                distances.pop(0)
             avg_distance = sum(distances) / len(distances)
 
-            # Use a threshold with hysteresis
-            if avg_distance > 3000 and initial_distance < 200:  # Object moved away (distance increased significantly)
+            print(f"Current distance: {current_distance}, Average distance: {avg_distance}")
+
+            if avg_distance > 3000 and initial_distance < 200:
                 print("Object moved away, measuring time duration...")
                 break
 
-            # Add a delay between readings
-            time.sleep(delay)
+            time.sleep(0.1)
 
-        # Wait until the object is detected again
         while True:
             current_distance = sensors[2].get_distance()
             distances.append(current_distance)
-
-            # Calculate the moving average
-            if len(distances) > window_size:
-                distances.pop(0)
             avg_distance = sum(distances) / len(distances)
 
-            # Use a threshold with hysteresis
-            if avg_distance < 150 and initial_distance > 3000:  # Object reappeared
+            print(f"Current distance: {current_distance}, Average distance: {avg_distance}")
+
+            if avg_distance < 150 and initial_distance > 3000:
                 print("Second object detected!")
                 end_time = time.time()
-                relay2.off()  # Stop moving backward
+                relay2.off()
                 break
 
-            # Add a delay between readings
-            time.sleep(delay)
+            time.sleep(0.1)
 
-        duration = end_time - start_time  # Calculate the time duration for which the distance was long
-        distance_between_objects = duration * 0.0497  # Calculate the distance based on time and speed
-
+        duration = end_time - start_time
+        distance_between_objects = duration * 0.0497
         print(f"Distance between objects: {distance_between_objects:.2f} meters")
         return distance_between_objects
+
+    print("No initial object detected")
+    return 0
+
 
 try:
     distance_measurement_active = False  # Flag to control when distance measurement is active
