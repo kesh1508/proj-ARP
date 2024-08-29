@@ -146,51 +146,38 @@ def sensor_values_within_tolerance(sensor_values, expected_values_list, toleranc
     return False
 
 def calculate_distance_between_objects():
-    initial_distance = sensors[2].get_distance()
-    print(f"Initial distance: {initial_distance}")
+    """Calculate the distance between objects based on sensor readings."""
+    initial_distance = sensors[2].get_distance()  # Get initial distance from the third sensor
 
-    if initial_distance < 200:
+    if initial_distance < 600:  # Initial object detected
         print("Initial object detected, starting to move backward...")
-        relay2.on()
+        relay2.on()  # Start moving backward
         start_time = time.time()
 
-        distances = []
         while True:
             current_distance = sensors[2].get_distance()
-            distances.append(current_distance)
-            avg_distance = sum(distances) / len(distances)
 
-            print(f"Current distance: {current_distance}, Average distance: {avg_distance}")
-
-            if avg_distance > 3000 and initial_distance < 200:
+            if current_distance > 1000:  # Object moved away (distance increased significantly)
                 print("Object moved away, measuring time duration...")
                 break
 
-            time.sleep(0.1)
+            time.sleep(0.5)
 
+        # Wait until the object is detected again
         while True:
             current_distance = sensors[2].get_distance()
-            distances.append(current_distance)
-            avg_distance = sum(distances) / len(distances)
 
-            print(f"Current distance: {current_distance}, Average distance: {avg_distance}")
-
-            if avg_distance < 150 and initial_distance > 3000:
+            if current_distance < 700:  # Object reappeared
                 print("Second object detected!")
                 end_time = time.time()
-                relay2.off()
+                relay2.off()  # Stop moving backward
                 break
 
-            time.sleep(0.1)
+        duration = end_time - start_time  # Calculate the time duration for which the distance was long
+        distance_between_objects = duration * 0.0497  # Calculate the distance based on time and speed
 
-        duration = end_time - start_time
-        distance_between_objects = duration * 0.0497
         print(f"Distance between objects: {distance_between_objects:.2f} meters")
         return distance_between_objects
-
-    print("No initial object detected")
-    return 0
-
 
 try:
     distance_measurement_active = False  # Flag to control when distance measurement is active
@@ -237,11 +224,11 @@ try:
                         if sensor_values_within_tolerance(sensor_values, expected_values_list):
                             print("Sensor values within tolerance, calculating distance between objects...")
                             distance = calculate_distance_between_objects()  # Calculate distance between objects
-                            if distance > 1.05:
-                                print("Distance greater than 1.05 meters, executing move sequence.")
+                            if distance > 0.80:
+                                print("Distance greater than 0.80 meters, executing move sequence.")
                                 move_sequence()  # Execute movement sequence
                             else:
-                                print("Distance less than or equal to 1.05 meters, sequence not executed.")
+                                print("Distance less than or equal to 0.80 meters, sequence not executed.")
                         else:
                             print("Sensor values not within tolerance, sequence not executed.")
 
