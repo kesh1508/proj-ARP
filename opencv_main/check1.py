@@ -200,9 +200,26 @@ try:
                     print("Down Arrow pressed, turning relay 2 ON")
                     relay2.on()  # Turn on relay 2
 
-                elif event.key == pygame.K_c:
-                    print("C key pressed, enabling distance measurement mode")
-                    distance_measurement_active = True
+                elif event.key == pygame.K_RETURN:  # Enter key pressed
+                    print("Enter key pressed, starting object detection...")
+                    if detect_objects():  # Start object detection
+                        print("Checking sensor values...")
+                        sensor_values = []
+                        for i, sensor in enumerate(sensors[:5]):  # Only check the first 5 sensors
+                            distance = sensor.get_distance()
+                            sensor_values.append(distance)
+
+                        expected_values = [8100, 8100, 190, 430, 8100]
+                        if sensor_values_within_tolerance(sensor_values, expected_values):
+                            print("Sensor values within tolerance, calculating distance between objects...")
+                            distance = calculate_distance_between_objects()  # Calculate distance between objects
+                            if distance > 1.05:
+                                print("Distance greater than 1.05 meters, executing move sequence.")
+                                move_sequence()  # Execute movement sequence
+                            else:
+                                print("Distance less than or equal to 1.05 meters, sequence not executed.")
+                        else:
+                            print("Sensor values not within tolerance, sequence not executed.")
 
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
@@ -214,29 +231,6 @@ try:
                 elif event.key == pygame.K_DOWN:
                     print("Turning relay 2 OFF")
                     relay2.off()  # Turn off relay 2
-
-        if distance_measurement_active:
-            print("Distance measurement active, calculating distance between objects...")
-            if detect_objects():  # Check for object detection
-                print("Checking sensor values...")
-                sensor_values = []
-                for i, sensor in enumerate(sensors[:5]):  # Only check the first 5 sensors
-                    distance = sensor.get_distance()
-                    sensor_values.append(distance)
-
-                expected_values = [8100, 8100, 190, 430, 8100]
-                if sensor_values_within_tolerance(sensor_values, expected_values):
-                    print("Sensor values within tolerance, calculating distance between objects...")
-                    distance = calculate_distance_between_objects()  # Calculate distance between objects
-                    if distance > 1.05:
-                        print("Distance greater than 1.05 meters, executing move sequence.")
-                        move_sequence()  # Execute movement sequence
-                    else:
-                        print("Distance less than or equal to 1.05 meters, sequence not executed.")
-                else:
-                    print("Sensor values not within tolerance, sequence not executed.")
-
-            distance_measurement_active = False  # Reset flag after one cycle
 
         time.sleep(timing / 1000000.00)
 
